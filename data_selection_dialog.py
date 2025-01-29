@@ -122,24 +122,57 @@ class DataSelectionDialog(QDialog):
             QMessageBox.warning(self, "Error", f"Failed to load .mat file:\n{e}")
 
 
+    # def _populate_tree_with_hdf5(self, h5_path):
+    #     try:
+    #         import h5py
+    #         with h5py.File(h5_path, 'r') as f:
+    #             for key in f.keys():
+    #                 obj = f[key]
+    #                 if isinstance(obj, h5py.Group):
+    #                     item_type = "Group"
+    #                 elif isinstance(obj, h5py.Dataset):
+    #                     item_type = "Dataset"
+    #                 else:
+    #                     item_type = "Unknown"
+
+    #                 item = QTreeWidgetItem([key, item_type])
+    #                 item.setCheckState(0, Qt.CheckState.Unchecked)
+    #                 self.tree_widget.addTopLevelItem(item)
+    #     except Exception as e:
+    #         QMessageBox.warning(self, "Error", f"Failed to load HDF5 file: {e}")
+
     def _populate_tree_with_hdf5(self, h5_path):
+        """
+        Recursively populates the tree with the structure of an HDF5 file.
+        """
         try:
             import h5py
             with h5py.File(h5_path, 'r') as f:
-                for key in f.keys():
-                    obj = f[key]
-                    if isinstance(obj, h5py.Group):
-                        item_type = "Group"
-                    elif isinstance(obj, h5py.Dataset):
-                        item_type = "Dataset"
-                    else:
-                        item_type = "Unknown"
+                self._add_hdf5_items(f, self.tree_widget.invisibleRootItem())
 
-                    item = QTreeWidgetItem([key, item_type])
-                    item.setCheckState(0, Qt.CheckState.Unchecked)
-                    self.tree_widget.addTopLevelItem(item)
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to load HDF5 file: {e}")
+
+    def _add_hdf5_items(self, h5_group, parent_item):
+        """
+        Recursively adds items from an HDF5 group to the tree.
+        
+        Parameters:
+        - h5_group: The current HDF5 group (or file) being explored.
+        - parent_item: The parent QTreeWidgetItem to which new items are added.
+        """
+        for key in h5_group.keys():
+            obj = h5_group[key]
+            
+            if isinstance(obj, h5py.Group):  # If it's a group, recurse into it
+                item = QTreeWidgetItem([key, "Group"])
+                parent_item.addChild(item)
+                self._add_hdf5_items(obj, item)  # Recursively add items inside this group
+
+            elif isinstance(obj, h5py.Dataset):  # If it's a dataset, add as a selectable item
+                item = QTreeWidgetItem([key, "Dataset"])
+                item.setCheckState(0, Qt.CheckState.Unchecked)
+                parent_item.addChild(item)
 
 
     def on_ok(self):
