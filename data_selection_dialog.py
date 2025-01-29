@@ -122,25 +122,6 @@ class DataSelectionDialog(QDialog):
             QMessageBox.warning(self, "Error", f"Failed to load .mat file:\n{e}")
 
 
-    # def _populate_tree_with_hdf5(self, h5_path):
-    #     try:
-    #         import h5py
-    #         with h5py.File(h5_path, 'r') as f:
-    #             for key in f.keys():
-    #                 obj = f[key]
-    #                 if isinstance(obj, h5py.Group):
-    #                     item_type = "Group"
-    #                 elif isinstance(obj, h5py.Dataset):
-    #                     item_type = "Dataset"
-    #                 else:
-    #                     item_type = "Unknown"
-
-    #                 item = QTreeWidgetItem([key, item_type])
-    #                 item.setCheckState(0, Qt.CheckState.Unchecked)
-    #                 self.tree_widget.addTopLevelItem(item)
-    #     except Exception as e:
-    #         QMessageBox.warning(self, "Error", f"Failed to load HDF5 file: {e}")
-
     def _populate_tree_with_hdf5(self, h5_path):
         """
         Recursively populates the tree with the structure of an HDF5 file.
@@ -152,6 +133,7 @@ class DataSelectionDialog(QDialog):
 
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to load HDF5 file: {e}")
+
 
     def _add_hdf5_items(self, h5_group, parent_item):
         """

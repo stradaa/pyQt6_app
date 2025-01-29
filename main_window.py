@@ -110,10 +110,13 @@ class GraFTMainWindow(QMainWindow):
         print(f"[MainApp] Loading data from: {self.data_path}")
         # At this point, you already know which items user selected:
         if self.selected_items:
+            print("Hello")
             print("[MainApp] The user selected:")
             for name, dtype in self.selected_items:
+                print(dir(self.selected_items))
                 print(f"  - {name} ({dtype})")
         else:
+            print("Here -alex")
             print("[MainApp] No items were selected.")
 
 
