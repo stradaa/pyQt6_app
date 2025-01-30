@@ -1,6 +1,5 @@
 import os
 import h5py
-import scipy.io
 from PyQt6.QtWidgets import (
     QDialog,
     QTreeWidget, QTreeWidgetItem,
@@ -28,7 +27,7 @@ class DataSelectionDialog(QDialog):
 
         # Tree widget to display contents
         self.tree_widget = QTreeWidget()
-        self.tree_widget.setHeaderLabels(["Name", "Type"])
+        self.tree_widget.setHeaderLabels(["Name", "Type", "Shape", "Data Type", "Size (MB)", "Attributes"])
         self.layout.addWidget(self.tree_widget)
 
         # Button layout
@@ -40,12 +39,22 @@ class DataSelectionDialog(QDialog):
 
         # Connect signals
         self.ok_button.clicked.connect(self.on_ok)
-        self.cancel_button.clicked.connect(self.reject)
+        self.cancel_button.clicked.connect(self.on_cancel)
+        self.tree_widget.itemChanged.connect(self.limit_dataset_selection)
 
         self.layout.addLayout(btn_layout)
 
         # Load the path structure
         self.populate_tree()
+
+    
+    def on_cancel(self):
+        """
+        Handles the case where the user cancels the DataSelectionDialog.
+        """
+        print("[DataSelectionDialog] User canceled selection.")
+        self.reject()  # Close this dialog and return control to parent
+    
 
     def populate_tree(self):
         """
@@ -135,39 +144,103 @@ class DataSelectionDialog(QDialog):
             QMessageBox.warning(self, "Error", f"Failed to load HDF5 file: {e}")
 
 
-    def _add_hdf5_items(self, h5_group, parent_item):
+    def _add_hdf5_items(self, h5_group, parent_item, parent_path=""):
         """
-        Recursively adds items from an HDF5 group to the tree.
-        
+        Recursively adds items from an HDF5 group to the tree, including metadata.
+
         Parameters:
         - h5_group: The current HDF5 group (or file) being explored.
         - parent_item: The parent QTreeWidgetItem to which new items are added.
+        - parent_path: The full path to the current dataset or group.
         """
         for key in h5_group.keys():
             obj = h5_group[key]
-            
-            if isinstance(obj, h5py.Group):  # If it's a group, recurse into it
-                item = QTreeWidgetItem([key, "Group"])
-                parent_item.addChild(item)
-                self._add_hdf5_items(obj, item)  # Recursively add items inside this group
+            full_path = f"{parent_path}/{key}".strip("/")  # Construct full dataset path
 
-            elif isinstance(obj, h5py.Dataset):  # If it's a dataset, add as a selectable item
-                item = QTreeWidgetItem([key, "Dataset"])
-                item.setCheckState(0, Qt.CheckState.Unchecked)
+            if isinstance(obj, h5py.Group):  
+                item = QTreeWidgetItem([key, "Group", "", "", "", ""])  # Groups have no shape or size
                 parent_item.addChild(item)
+                self._add_hdf5_items(obj, item, full_path)  # Recursively add children
+
+            elif isinstance(obj, h5py.Dataset):  
+                shape = str(obj.shape)  # Dataset shape
+                dtype = str(obj.dtype)  # Data type
+                size_bytes = obj.size * obj.dtype.itemsize  # Total bytes
+                size_mb = f"{size_bytes / (1024 ** 2):.2f}"  # Convert to MB
+                num_attrs = str(len(obj.attrs))  # Attribute count
+
+                item = QTreeWidgetItem([key, "Dataset", shape, dtype, size_mb, num_attrs])
+                item.setCheckState(0, Qt.CheckState.Unchecked)
+                parent_item.addChild(item)          
+
+
+    def limit_dataset_selection(self, item, column):
+        """
+        Ensures that only one dataset can be selected at a time.
+        If a new dataset is checked, all other datasets are unchecked.
+        """
+        if item.checkState(0) == Qt.CheckState.Checked:
+            # Traverse all items and uncheck any other selected dataset
+            def uncheck_all_others(tree_item, exclude_item):
+                for i in range(tree_item.childCount()):
+                    child = tree_item.child(i)
+                    if child is not exclude_item and child.checkState(0) == Qt.CheckState.Checked:
+                        child.setCheckState(0, Qt.CheckState.Unchecked)
+                    # Recursively check inside groups
+                    uncheck_all_others(child, exclude_item)
+
+            # Start checking from root
+            root = self.tree_widget.invisibleRootItem()
+            uncheck_all_others(root, item)
 
 
     def on_ok(self):
         """
-        Gather which items are checked, then accept the dialog.
+        Ensures only one selected dataset is passed to self.selected_items.
         """
         self.selected_items = []
         root = self.tree_widget.invisibleRootItem()
-        for i in range(root.childCount()):
-            child = root.child(i)
-            if child.checkState(0) == Qt.CheckState.Checked:
+
+        def find_selected_dataset(item, parent_path=""):
+            """
+            Recursively finds the single selected dataset.
+            """
+            # Check if data is in root (contains no child)
+            if item.childCount() == 0 and item.checkState(0) == Qt.CheckState.Checked and item.text(1) == "Dataset":
+                name = item.text(0)
+                data_type = item.text(1)
+                full_path = f"{parent_path}/{name}".strip("/")
+
+                self.selected_items = [(full_path, data_type)]
+                return
+
+            # this is used if it contains children to see if any of those have been selected
+            for i in range(item.childCount()):
+                child = item.child(i)
                 name = child.text(0)
                 data_type = child.text(1)
-                self.selected_items.append((name, data_type))
+                full_path = f"{parent_path}/{name}".strip("/")
 
-        self.accept()
+                if child.checkState(0) == Qt.CheckState.Checked and data_type == "Dataset":
+                    # shape = child.text(2)
+                    # dtype = child.text(3)
+                    # size_mb = child.text(4)
+                    # num_attrs = child.text(5)
+
+                    # Store the only selected dataset
+                    self.selected_items = [(full_path, data_type)]
+                    return  # Stop searching once one is found
+
+                # Continue searching in groups
+                find_selected_dataset(child, full_path)
+
+        # Start searching from root
+        for i in range(root.childCount()):
+            find_selected_dataset(root.child(i))
+
+        # Confirm selection
+        if self.selected_items:
+            print(f"[DataSelectionDialog] Selected dataset: {self.selected_items[0]}")
+            self.accept()
+        else:
+            QMessageBox.warning(self, "Selection Required", "Please select one dataset before proceeding.")
