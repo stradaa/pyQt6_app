@@ -27,7 +27,7 @@ class DataSelectionDialog(QDialog):
 
         # Tree widget to display contents
         self.tree_widget = QTreeWidget()
-        self.tree_widget.setHeaderLabels(["Name", "Type", "Shape", "Data Type", "Size (MB)", "Attributes"])
+        self.tree_widget.setHeaderLabels(["Name", "Type", "Shape", "Data Type", "Size (MB)"])
         self.layout.addWidget(self.tree_widget)
 
         # Button layout
@@ -66,7 +66,7 @@ class DataSelectionDialog(QDialog):
         else:
             _, ext = os.path.splitext(self.data_path)
             ext = ext.lower()
-            if ext in [".mat", ".m"]:
+            if ext in [".mat"]:
                 self._populate_tree_with_mat(self.data_path)
             elif ext in [".h5", ".hdf5"]:
                 self._populate_tree_with_hdf5(self.data_path)
@@ -123,8 +123,13 @@ class DataSelectionDialog(QDialog):
             for k in mat_dict:
                 if k.startswith("__"):
                     continue
-                dtype_str = str(type(mat_dict[k]))
-                item = QTreeWidgetItem([k, dtype_str])
+                dtype = str(type(mat_dict[k])) # Dataset type
+                shape = str(mat_dict[k].shape)  # Dataset shape
+                size_bytes = mat_dict[k].nbytes  # Total bytes
+                size_mb = f"{size_bytes / (1024 ** 2):.2f}"  # Convert to MB
+
+                # adding to tree widget item
+                item = QTreeWidgetItem([k, "Dataset", shape, dtype, size_mb])
                 item.setCheckState(0, Qt.CheckState.Unchecked)
                 self.tree_widget.addTopLevelItem(item)
         except Exception as e:
@@ -158,7 +163,7 @@ class DataSelectionDialog(QDialog):
             full_path = f"{parent_path}/{key}".strip("/")  # Construct full dataset path
 
             if isinstance(obj, h5py.Group):  
-                item = QTreeWidgetItem([key, "Group", "", "", "", ""])  # Groups have no shape or size
+                item = QTreeWidgetItem([key, "Group", "", "", ""])  # Groups have no shape or size
                 parent_item.addChild(item)
                 self._add_hdf5_items(obj, item, full_path)  # Recursively add children
 
@@ -167,9 +172,8 @@ class DataSelectionDialog(QDialog):
                 dtype = str(obj.dtype)  # Data type
                 size_bytes = obj.size * obj.dtype.itemsize  # Total bytes
                 size_mb = f"{size_bytes / (1024 ** 2):.2f}"  # Convert to MB
-                num_attrs = str(len(obj.attrs))  # Attribute count
 
-                item = QTreeWidgetItem([key, "Dataset", shape, dtype, size_mb, num_attrs])
+                item = QTreeWidgetItem([key, "Dataset", shape, dtype, size_mb])
                 item.setCheckState(0, Qt.CheckState.Unchecked)
                 parent_item.addChild(item)          
 
@@ -225,7 +229,6 @@ class DataSelectionDialog(QDialog):
                     # shape = child.text(2)
                     # dtype = child.text(3)
                     # size_mb = child.text(4)
-                    # num_attrs = child.text(5)
 
                     # Store the only selected dataset
                     self.selected_items = [(full_path, data_type)]
