@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QAction
 import h5py
 import scipy
+from pynwb import NWBHDF5IO
 import numpy as np
 
 # dependencies
@@ -127,8 +128,10 @@ class GraFTMainWindow(QMainWindow):
         # Load data based on the file type
         if self.data_path.lower().endswith(('.h5', '.hdf5')):
             self._load_hdf5_data()
-        elif self.data_path.lower().endswith(('.mat')):
+        elif self.data_path.lower().endswith('.mat'):
             self._load_mat_data()
+        elif self.data_path.lower().endswith('.nwb'):
+            self._load_nwb_data()
         else:
             print("[MainApp] Unsupported file type.")
 
@@ -189,6 +192,30 @@ class GraFTMainWindow(QMainWindow):
                     print(f"[MainApp] '{name}' not found in .mat file.")
         except Exception as e:
             print(f"[MainApp] Error loading .mat file: {e}")
+
+
+    def _load_nwb_data(self):
+        """
+        Load selected datasets from an NWB file.
+        """
+        try:
+            with NWBHDF5IO(self.data_path, 'r') as io:
+                nwbfile = io.read()
+
+                for name, dtype in self.selected_items:
+                    try:
+                        # Check if dataset exists in NWB file
+                        if hasattr(nwbfile, name):
+                            dataset = getattr(nwbfile, name)
+                            self.loaded_data[name] = np.array(dataset.data[:])  # Convert to NumPy array
+                            print(f"[MainApp] Loaded dataset '{name}' from NWB file.")
+                        else:
+                            print(f"[MainApp] '{name}' not found in NWB file.")
+                    except Exception as e:
+                        print(f"[MainApp] Error extracting '{name}' from NWB: {e}")
+
+        except Exception as e:
+            print(f"[MainApp] Error loading NWB file: {e}")
 
 
     def _create_menu_bar(self):

@@ -54,7 +54,7 @@ class StartupDialog(QDialog):
     def on_load_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Select File", "",
-            "Data Files (*.h5 *.mat *.tiff *.tif);;All Files (*)"
+            "Data Files (*.h5 *.mat *.tiff *.tif *.nwb);;All Files (*)"
         )
         if file_path:
             self.selected_path = file_path

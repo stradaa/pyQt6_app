@@ -6,6 +6,8 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QMessageBox
 )
 from PyQt6.QtCore import Qt
+from pynwb import NWBHDF5IO
+
 
 class DataSelectionDialog(QDialog):
     """
@@ -66,10 +68,12 @@ class DataSelectionDialog(QDialog):
         else:
             _, ext = os.path.splitext(self.data_path)
             ext = ext.lower()
-            if ext in [".mat"]:
+            if ext == ".mat":
                 self._populate_tree_with_mat(self.data_path)
             elif ext in [".h5", ".hdf5"]:
                 self._populate_tree_with_hdf5(self.data_path)
+            elif ext == ".nwb":
+                self._populate_tree_with_nwb(self.data_path)  # NEW FUNCTION
             else:
                 # Fallback for unsupported file type
                 item = QTreeWidgetItem(["(No structured preview)", "Unknown"])
@@ -176,6 +180,63 @@ class DataSelectionDialog(QDialog):
                 item = QTreeWidgetItem([key, "Dataset", shape, dtype, size_mb])
                 item.setCheckState(0, Qt.CheckState.Unchecked)
                 parent_item.addChild(item)          
+
+
+    def _populate_tree_with_nwb(self, nwb_path):
+        """
+        Populates the tree with NWB file contents.
+        """
+        try:
+            with NWBHDF5IO(nwb_path, 'r') as io:
+                nwbfile = io.read()
+
+                # Create a top-level NWB item
+                nwb_item = QTreeWidgetItem(["NWB File", "Root", "", "", ""])
+                self.tree_widget.addTopLevelItem(nwb_item)
+
+                # Acquisition Data
+                if nwbfile.acquisition:
+                    acquisition_item = QTreeWidgetItem(["Acquisition", "Group", "", "", ""])
+                    nwb_item.addChild(acquisition_item)
+                    for name, dataset in nwbfile.acquisition.items():
+                        self._add_nwb_dataset(acquisition_item, name, dataset)
+
+                # Processing Modules
+                if nwbfile.processing:
+                    processing_item = QTreeWidgetItem(["Processing", "Group", "", "", ""])
+                    nwb_item.addChild(processing_item)
+                    for module_name, module in nwbfile.processing.items():
+                        module_item = QTreeWidgetItem([module_name, "Module", "", "", ""])
+                        processing_item.addChild(module_item)
+                        for name, dataset in module.data_interfaces.items():
+                            self._add_nwb_dataset(module_item, name, dataset)
+
+                # Stimulus Data
+                if nwbfile.stimulus:
+                    stimulus_item = QTreeWidgetItem(["Stimulus", "Group", "", "", ""])
+                    nwb_item.addChild(stimulus_item)
+                    for name, dataset in nwbfile.stimulus.items():
+                        self._add_nwb_dataset(stimulus_item, name, dataset)
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to load NWB file: {e}")
+
+
+    def _add_nwb_dataset(self, parent_item, name, dataset):
+        """
+        Adds a dataset from NWB to the tree widget.
+        """
+        try:
+            shape = str(dataset.data.shape) if hasattr(dataset, 'data') else "Unknown"
+            dtype = str(dataset.data.dtype) if hasattr(dataset, 'data') else "Unknown"
+            size_bytes = dataset.data.nbytes if hasattr(dataset, 'data') else 0
+            size_mb = f"{size_bytes / (1024 ** 2):.2f}"  # Convert to MB
+
+            item = QTreeWidgetItem([name, "Dataset", shape, dtype, size_mb])
+            item.setCheckState(0, Qt.CheckState.Unchecked)
+            parent_item.addChild(item)
+        except Exception as e:
+            print(f"[DataSelectionDialog] Error adding NWB dataset '{name}': {e}")
 
 
     def limit_dataset_selection(self, item, column):
