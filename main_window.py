@@ -144,25 +144,50 @@ class GraFTMainWindow(QMainWindow):
             print("[MainApp] No data was loaded.")
 
 
+    # def _load_hdf5_data(self):
+    #     """
+    #     Load selected datasets from an HDF5 file.
+    #     """
+    #     try:
+    #         with h5py.File(self.data_path, 'r') as f:
+    #             for name, dtype in self.selected_items:
+    #                 if dtype == "Dataset":
+    #                     self.loaded_data[name] = np.array(f[name])  # Convert to a NumPy array
+    #                     print(f"[MainApp] Loaded dataset '{name}' from HDF5 file.")
+    #                 else:
+    #                     print(f"[MainApp] Skipping '{name}', as it is not a dataset.")
+    #     except Exception as e:
+    #         print(f"[MainApp] Error loading HDF5 file: {e}")
+
     def _load_hdf5_data(self):
         """
-        Load selected datasets from an HDF5 file.
+        Load selected datasets from an HDF5 (.h5 or .hdf5) file and print the results.
+        Supports nested groups within the HDF5 file.
         """
         try:
             with h5py.File(self.data_path, 'r') as f:
-                for name, dtype in self.selected_items:
-                    if dtype == "Dataset":
-                        self.loaded_data[name] = np.array(f[name])  # Convert to a NumPy array
-                        print(f"[MainApp] Loaded dataset '{name}' from HDF5 file.")
+                for full_path, dtype in self.selected_items:
+                    # Convert Windows-style backslashes to forward slashes for HDF5 paths
+                    dataset_path = full_path.replace("\\", "/")
+
+                    # Extract the relative dataset path inside the HDF5 file
+                    relative_path = dataset_path.replace(self.data_path.replace("\\", "/"), "").lstrip("/")
+
+                    if relative_path in f:
+                        data = np.array(f[relative_path])  # Convert dataset to NumPy array
+                        self.loaded_data[relative_path] = data
+                        print(f"\n[MainApp] Successfully loaded dataset '{relative_path}':\n", data)
+
                     else:
-                        print(f"[MainApp] Skipping '{name}', as it is not a dataset.")
+                        print(f"[MainApp] Dataset '{relative_path}' not found in HDF5 file.")
+
         except Exception as e:
             print(f"[MainApp] Error loading HDF5 file: {e}")
 
 
     def _load_mat_data(self):
         """
-        Load selected variables from a MATLAB .mat file.
+        Load selected variables from a MATLAB .mat file and print the result.
         """
         def is_mat73(file_path):
             """
@@ -181,15 +206,26 @@ class GraFTMainWindow(QMainWindow):
             self._load_hdf5_data()
             return
 
-        # Otherwise, treat it as a regular .mat file
         try:
+            # Load the .mat file
             mat_dict = scipy.io.loadmat(self.data_path, squeeze_me=False, struct_as_record=False)
-            for name, dtype in self.selected_items:
-                if name in mat_dict:
-                    self.loaded_data[name] = mat_dict[name]  # Load the variable
-                    print(f"[MainApp] Loaded variable '{name}' from .mat file.")
+
+            for full_path, dtype in self.selected_items:
+                var_name = os.path.basename(full_path)  # Extract just the variable name
+
+                if var_name in mat_dict:
+                    data = mat_dict[var_name]  # Extract data
+
+                    # Convert MATLAB struct objects to dictionary for readability
+                    if isinstance(data, np.ndarray) and data.dtype.names is not None:
+                        data = {field: data[field] for field in data.dtype.names}
+
+                    self.loaded_data[var_name] = data  # Store loaded variable
+                    print(f"\n[MainApp] Successfully loaded variable '{var_name}':\n", data) # print for now
+
                 else:
-                    print(f"[MainApp] '{name}' not found in .mat file.")
+                    print(f"[MainApp] '{var_name}' not found in .mat file.")
+
         except Exception as e:
             print(f"[MainApp] Error loading .mat file: {e}")
 

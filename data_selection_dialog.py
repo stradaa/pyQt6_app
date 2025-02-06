@@ -127,7 +127,6 @@ class DataSelectionDialog(QDialog):
             QMessageBox.warning(self, "Error", f"Failed to load folder: {e}")
 
 
-
     def toggle_all_images_selection(self):
         """
         Check or uncheck all image files in the folder.
