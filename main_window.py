@@ -16,6 +16,7 @@ from startup_dialog import StartupDialog
 import os
 from data_selection_dialog import DataSelectionDialog
 
+
 ###############################################################################
 # The Main Window
 ###############################################################################
@@ -143,21 +144,6 @@ class GraFTMainWindow(QMainWindow):
         else:
             print("[MainApp] No data was loaded.")
 
-
-    # def _load_hdf5_data(self):
-    #     """
-    #     Load selected datasets from an HDF5 file.
-    #     """
-    #     try:
-    #         with h5py.File(self.data_path, 'r') as f:
-    #             for name, dtype in self.selected_items:
-    #                 if dtype == "Dataset":
-    #                     self.loaded_data[name] = np.array(f[name])  # Convert to a NumPy array
-    #                     print(f"[MainApp] Loaded dataset '{name}' from HDF5 file.")
-    #                 else:
-    #                     print(f"[MainApp] Skipping '{name}', as it is not a dataset.")
-    #     except Exception as e:
-    #         print(f"[MainApp] Error loading HDF5 file: {e}")
 
     def _load_hdf5_data(self):
         """
