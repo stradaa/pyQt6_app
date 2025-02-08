@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (
     QApplication, QDialog, QMainWindow, QWidget, QTabWidget, QMessageBox)
 from PyQt6.QtGui import QAction
 import h5py
+import re
 import scipy
 from pynwb import NWBHDF5IO
 import numpy as np
@@ -15,6 +16,7 @@ from startup_dialog import StartupDialog
 
 import os
 from data_selection_dialog import DataSelectionDialog
+from color_manager import ColorCycler 
 
 
 ###############################################################################
@@ -25,7 +27,7 @@ class GraFTMainWindow(QMainWindow):
     Main Application Window.
     Initialized with a data_path from the StartupDialog.
     """
-    def __init__(self, data_path=None, selected_items=None, parent=None):
+    def __init__(self, data_path=None, selected_items=None, menubar_color=None, parent=None):
         super().__init__(parent)
 
         self.data_path = data_path
@@ -34,7 +36,10 @@ class GraFTMainWindow(QMainWindow):
         self.setWindowTitle("GraFT-App")
         self.setMinimumSize(1000, 600)
 
-        self.setStyleSheet(self._get_modern_style())
+        # If no color is provided, default to your original color
+        if menubar_color is None:
+            menubar_color = "#e0e0e0"
+        self.setStyleSheet(self._get_modern_style(menubar_color))
 
         self.tab_widget = QTabWidget()
         self.setCentralWidget(self.tab_widget)
@@ -58,58 +63,106 @@ class GraFTMainWindow(QMainWindow):
         if self.data_path:
             self.load_data()
 
-    def _get_modern_style(self):
-        """
-        Returns a stylesheet string. 
-        Keep this separate for easier modification or theming.
-        """
-        return """
-            QMainWindow {
+    # def _get_modern_style(self):
+    #     """
+    #     Returns a stylesheet string. 
+    #     Keep this separate for easier modification or theming.
+    #     """
+    #     return """
+    #         QMainWindow {
+    #             background-color: #f5f5f5;
+    #         }
+    #         QTabWidget::pane {
+    #             border: 1px solid #cccccc;
+    #             background: #ffffff;
+    #         }
+    #         QTabBar::tab {
+    #             background: #e0e0e0;
+    #             padding: 8px;
+    #             margin-right: 2px;
+    #         }
+    #         QTabBar::tab:selected {
+    #             background: #ffffff;
+    #             font-weight: bold;
+    #         }
+    #         QPushButton {
+    #             background-color: #0078d7;
+    #             color: white;
+    #             border-radius: 4px;
+    #             padding: 6px 12px;
+    #         }
+    #         QPushButton:hover {
+    #             background-color: #005aaa;
+    #         }
+    #         QMenuBar {
+    #             background-color: #e0e0e0;
+    #             color: #000000;
+    #         }
+    #         QMenuBar::item {
+    #             background-color: #e0e0e0;
+    #             color: #000000;
+    #         }
+    #         QMenuBar::item:selected {
+    #             background-color: #cacaca;
+    #         }
+    #         QMenu {
+    #             background-color: #ffffff;
+    #             color: #000000;
+    #             border: 1px solid #cccccc;
+    #         }
+    #         QMenu::item:selected {
+    #             background-color: #f0f0f0;
+    #         }
+    #     """
+    
+    def _get_modern_style(self, menubar_color="#e0e0e0"):
+        return f"""
+            QMainWindow {{
                 background-color: #f5f5f5;
-            }
-            QTabWidget::pane {
+            }}
+            QTabWidget::pane {{
                 border: 1px solid #cccccc;
                 background: #ffffff;
-            }
-            QTabBar::tab {
-                background: #e0e0e0;
+            }}
+            QTabBar::tab {{
+                background-color: {menubar_color};
                 padding: 8px;
                 margin-right: 2px;
-            }
-            QTabBar::tab:selected {
+            }}
+            QTabBar::tab:selected {{
                 background: #ffffff;
                 font-weight: bold;
-            }
-            QPushButton {
+            }}
+            QPushButton {{
                 background-color: #0078d7;
                 color: white;
                 border-radius: 4px;
                 padding: 6px 12px;
-            }
-            QPushButton:hover {
+            }}
+            QPushButton:hover {{
                 background-color: #005aaa;
-            }
-            QMenuBar {
-                background-color: #e0e0e0;
+            }}
+            QMenuBar {{
+                background-color: {menubar_color};
                 color: #000000;
-            }
-            QMenuBar::item {
-                background-color: #e0e0e0;
+            }}
+            QMenuBar::item {{
+                background-color: {menubar_color};
                 color: #000000;
-            }
-            QMenuBar::item:selected {
+            }}
+            QMenuBar::item:selected {{
                 background-color: #cacaca;
-            }
-            QMenu {
+            }}
+            QMenu {{
                 background-color: #ffffff;
                 color: #000000;
                 border: 1px solid #cccccc;
-            }
-            QMenu::item:selected {
+            }}
+            QMenu::item:selected {{
                 background-color: #f0f0f0;
-            }
+            }}
         """
-    
+
 
     def load_data(self):
         print(f"[MainApp] Loading data from: {self.data_path}")
@@ -145,27 +198,58 @@ class GraFTMainWindow(QMainWindow):
             print("[MainApp] No data was loaded.")
 
 
+    # def _load_hdf5_data(self):
+    #     """
+    #     Load selected datasets from an HDF5 (.h5 or .hdf5) file and print the results.
+    #     Supports nested groups within the HDF5 file.
+    #     """
+    #     try:
+    #         with h5py.File(self.data_path, 'r') as f:
+    #             for full_path, dtype in self.selected_items:
+    #                 # Convert Windows-style backslashes to forward slashes for HDF5 paths
+    #                 dataset_path = full_path.replace("\\", "/")
+
+    #                 # Extract the relative dataset path inside the HDF5 file
+    #                 relative_path = dataset_path.replace(self.data_path.replace("\\", "/"), "").lstrip("/")
+
+    #                 if relative_path in f:
+    #                     data = np.array(f[relative_path])  # Convert dataset to NumPy array
+    #                     self.loaded_data[relative_path] = data
+    #                     print(f"\n[MainApp] Successfully loaded dataset '{relative_path}':\n", data)
+
+    #                 else:
+    #                     print(f"[MainApp] Dataset '{relative_path}' not found in HDF5 file.")
+
+    #     except Exception as e:
+    #         print(f"[MainApp] Error loading HDF5 file: {e}")
+
+
     def _load_hdf5_data(self):
         """
         Load selected datasets from an HDF5 (.h5 or .hdf5) file and print the results.
-        Supports nested groups within the HDF5 file.
+        Works on both Windows and Unix-based systems (macOS, Linux).
         """
         try:
             with h5py.File(self.data_path, 'r') as f:
                 for full_path, dtype in self.selected_items:
-                    # Convert Windows-style backslashes to forward slashes for HDF5 paths
-                    dataset_path = full_path.replace("\\", "/")
+                    # Extract only the internal dataset path inside the HDF5 file
+                    relative_path = full_path.replace(self.data_path, "").lstrip("/").lstrip("\\")  # Normalize path
+                    dataset_path = re.sub(r'^.*\.h5/', '', relative_path)  # Removes everything up to and including ".h5/"
 
-                    # Extract the relative dataset path inside the HDF5 file
-                    relative_path = dataset_path.replace(self.data_path.replace("\\", "/"), "").lstrip("/")
+                    print(f"[MainApp] Trying to load dataset: '{relative_path}'")
 
-                    if relative_path in f:
-                        data = np.array(f[relative_path])  # Convert dataset to NumPy array
+                    # Ensure dataset exists in file
+                    if dataset_path in f:
+                        data = np.array(f[dataset_path])
                         self.loaded_data[relative_path] = data
                         print(f"\n[MainApp] Successfully loaded dataset '{relative_path}':\n", data)
 
                     else:
-                        print(f"[MainApp] Dataset '{relative_path}' not found in HDF5 file.")
+                        print(f"[MainApp] Dataset '{relative_path}' not found in HDF5 file. Available datasets:")
+                        def print_hdf5_structure(name, obj):
+                            print(f" - {name}")
+
+                        f.visititems(print_hdf5_structure)  # for debugging
 
         except Exception as e:
             print(f"[MainApp] Error loading HDF5 file: {e}")
@@ -284,8 +368,15 @@ class GraFTMainWindow(QMainWindow):
                     # The user selected a dataset
                     selected_items = data_dialog.selected_items
 
+                    menubar_color = ColorCycler.get_next_color()
+                    print("NEW COLOR:", menubar_color)
+
                     # Open the main application window with the selected dataset
-                    new_window = GraFTMainWindow(data_path=data_path, selected_items=selected_items)
+                    new_window = GraFTMainWindow(
+                        data_path=data_path,
+                        selected_items=selected_items,
+                        menubar_color=menubar_color
+                    )
                     new_window.show()
 
                     # Store reference so it's not garbage collected
